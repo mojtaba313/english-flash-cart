@@ -44,6 +44,11 @@ function App() {
   const [editingWord, setEditingWord] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [translationInput, setTranslationInput] = useState("");
+  const [translationResult, setTranslationResult] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationDirection, setTranslationDirection] = useState("faToEn");
 
   // بارگذاری کلمات از localStorage هنگام لود اولیه
   useEffect(() => {
@@ -70,6 +75,72 @@ function App() {
     localStorage.setItem("vocabularyWords", JSON.stringify(words));
     globalStorage.setItem("vocabularyWords", words);
   }, [words]);
+
+  // پخش تلفظ کلمه انگلیسی
+  // در تابع speakWord، پارامتر language را به صورت زیر تنظیم کنید:
+  const speakWord = (text, language = "en-US") => {
+    if ("speechSynthesis" in window) {
+      // توقف پخش قبلی
+      speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = language;
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+
+      setIsPlaying(true);
+
+      utterance.onend = () => {
+        setIsPlaying(false);
+      };
+
+      utterance.onerror = () => {
+        setIsPlaying(false);
+      };
+
+      speechSynthesis.speak(utterance);
+    } else {
+      alert("مرورگر شما از قابلیت Text-to-Speech پشتیبانی نمی‌کند");
+    }
+  };
+
+  // توقف پخش صدا
+  const stopSpeaking = () => {
+    if ("speechSynthesis" in window) {
+      speechSynthesis.cancel();
+      setIsPlaying(false);
+    }
+  };
+
+  // تابع translateText قبلی را با این نسخه جایگزین کنید:
+  const translateText = async (text, fromLang, toLang) => {
+    if (!text.trim()) return;
+
+    setIsTranslating(true);
+    setTranslationResult("");
+
+    try {
+      // استفاده از API رایگان MyMemory برای ترجمه
+      const response = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+          text
+        )}&langpair=${fromLang}|${toLang}`
+      );
+
+      const data = await response.json();
+
+      if (data.responseStatus === 200) {
+        setTranslationResult(data.responseData.translatedText);
+      } else {
+        setTranslationResult("خطا در ترجمه. لطفا دوباره تلاش کنید.");
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      setTranslationResult("خطا در اتصال به سرویس ترجمه");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   // پردازش متن ورودی و تبدیل به کلمات
   const processInputText = () => {
@@ -264,11 +335,37 @@ function App() {
               >
                 <div className="card-front">
                   <h2>{currentWord.english}</h2>
+                  <div className="audio-controls">
+                    <button
+                      className={`btn-audio ${isPlaying ? "playing" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isPlaying) {
+                          stopSpeaking();
+                        } else {
+                          speakWord(currentWord.english);
+                        }
+                      }}
+                    >
+                      {isPlaying ? "⏹️ توقف" : "🔊 پخش تلفظ"}
+                    </button>
+                  </div>
                   <p>برای دیدن معنی کلیک کنید</p>
                 </div>
                 <div className="card-back">
                   <h2>{currentWord.persian}</h2>
                   <p>{currentWord.english}</p>
+                  <div className="audio-controls">
+                    <button
+                      className="btn-audio"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        speakWord(currentWord.english);
+                      }}
+                    >
+                      🔊 پخش تلفظ
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -293,6 +390,76 @@ function App() {
                 : "کلمه‌ای برای نمایش وجود ندارد"}
             </div>
           )}
+        </div>
+
+        {/* بخش مترجم */}
+        <div className="translator-section">
+          <h2>
+            مترجم
+            <button
+              className="direction-toggle"
+              onClick={() =>
+                setTranslationDirection(
+                  translationDirection === "faToEn" ? "enToFa" : "faToEn"
+                )
+              }
+            >
+              {translationDirection === "faToEn"
+                ? "فارسی به انگلیسی 🔄"
+                : "انگلیسی به فارسی 🔄"}
+            </button>
+          </h2>
+          <div className="translator-container">
+            <div className="translator-input">
+              <textarea
+                value={translationInput}
+                onChange={(e) => setTranslationInput(e.target.value)}
+                placeholder={
+                  translationDirection === "faToEn"
+                    ? "متن فارسی خود را اینجا وارد کنید..."
+                    : "Enter English text here..."
+                }
+                rows="3"
+              />
+              <div className="translator-actions">
+                <button
+                  onClick={() => {
+                    if (translationDirection === "faToEn") {
+                      translateText(translationInput, "fa", "en");
+                    } else {
+                      translateText(translationInput, "en", "fa");
+                    }
+                  }}
+                  disabled={isTranslating || !translationInput.trim()}
+                >
+                  {isTranslating
+                    ? "در حال ترجمه..."
+                    : translationDirection === "faToEn"
+                    ? "ترجمه به انگلیسی"
+                    : "ترجمه به فارسی"}
+                </button>
+                <button
+                  onClick={() => {
+                    const lang =
+                      translationDirection === "faToEn" ? "fa" : "en-US";
+                    speakWord(translationResult || translationInput, lang);
+                  }}
+                  disabled={!translationResult && !translationInput}
+                >
+                  🔊 پخش
+                </button>
+              </div>
+            </div>
+            <div className="translation-result">
+              <h4>نتیجه ترجمه:</h4>
+              <div className="result-text">
+                {translationResult ||
+                  (translationDirection === "faToEn"
+                    ? "ترجمه انگلیسی اینجا نمایش داده می‌شود..."
+                    : "ترجمه فارسی اینجا نمایش داده می‌شود...")}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* بخش مدیریت کلمات */}
@@ -375,6 +542,13 @@ venteral:شکمی"
                     </div>
                   </div>
                   <div className="word-actions">
+                    <button
+                      className="btn-audio-small"
+                      onClick={() => speakWord(word.english)}
+                      title="پخش تلفظ"
+                    >
+                      🔊
+                    </button>
                     <button
                       className="btn-edit"
                       onClick={() => setEditingWord({ ...word })}
