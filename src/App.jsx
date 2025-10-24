@@ -43,7 +43,7 @@ function App() {
   useEffect(() => {
     const getData = async () => {
       const globalData = await globalStorage.getItem("vocabularyWords");
-      if (globalData) {
+      if (globalData?.length) {
         setWords(globalData);
       } else {
         const savedWords = localStorage.getItem("vocabularyWords");
