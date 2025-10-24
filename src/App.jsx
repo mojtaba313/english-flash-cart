@@ -21,7 +21,13 @@ const globalStorage = {
 
   getItem: async (key) => {
     const response = await fetch(
-      "https://api.jsonbin.io/v3/b/68fb0f30ae596e708f2813d5/latest"
+      "https://api.jsonbin.io/v3/b/68fb0f30ae596e708f2813d5/latest",
+      {
+        headers: {
+          "X-Master-Key":
+            "$2a$10$toN3vhOXs2adB5aFAVie8uknzBB5fpifGIDgbskiSgZWDpvSy15cu",
+        },
+      }
     );
     const data = await response.json();
     return data.record[key];
@@ -43,6 +49,7 @@ function App() {
   useEffect(() => {
     const getData = async () => {
       const globalData = await globalStorage.getItem("vocabularyWords");
+      console.log({ globalData });
       if (globalData?.length) {
         setWords(globalData);
       } else {
