@@ -41,11 +41,20 @@ function App() {
 
   // بارگذاری کلمات از localStorage هنگام لود اولیه
   useEffect(() => {
-    const savedWords = localStorage.getItem("vocabularyWords");
-    if (savedWords) {
-      setWords(JSON.parse(savedWords));
-    }
-    setIsLoaded(true);
+    const getData = async () => {
+      const globalData = await globalStorage.getItem("vocabularyWords");
+      if (globalData) {
+        setWords(globalData);
+      } else {
+        const savedWords = localStorage.getItem("vocabularyWords");
+        if (savedWords) {
+          setWords(JSON.parse(savedWords));
+        }
+      }
+      setIsLoaded(true);
+    };
+
+    getData();
   }, []);
 
   // ذخیره کلمات در localStorage هر زمان که تغییر کنند
